@@ -1,0 +1,24 @@
+{
+  "name": "comparer",
+  "version": "0.0.1",
+  "description": "Price Comparison Engine for Cheapass",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cheapass/comparer.git"
+  },
+  "keywords": [
+    "price",
+    "comparison",
+    "engine"
+  ],
+  "author": "Aakash Goel <aakash.lpin@gmail.com> (http://aakashgoel.com)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Cheapass/comparer/issues"
+  },
+  "homepage": "https://github.com/Cheapass/comparer#readme"
+}
