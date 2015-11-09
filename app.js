@@ -11,6 +11,7 @@ let merge = lodash.merge;
 var relevance = require('./src/relevance');
 
 const baseURL = 'http://localhost:6100/scrape';
+const userAgentString = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/40.0.2214.94 Safari/537.36';
 
 function getSite (url) {
   if (url.indexOf('flipkart.com') !== -1) {
@@ -22,7 +23,26 @@ function getSite (url) {
   return;
 }
 
-const userAgentString = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/40.0.2214.94 Safari/537.36';
+function getSearchURL (props) {
+  const site = props.site;
+  const title = props.title;
+  const queryTitle = encodeURIComponent(title).replace(/%20/g, '+');
+
+  switch (site) {
+    case 'flipkart':
+      return (
+        `http://www.snapdeal.com/search?keyword=${queryTitle}&santizedKeyword=&catId=&categoryId=&suggested=false&vertical=&noOfResults=5&clickSrc=go_header&lastKeyword=&prodCatId=&changeBackToAll=false&foundInAll=false&categoryIdSearched=&cityPageUrl=&url=&utmContent=&dealDetail=`
+      );
+    case 'snapdeal':
+      return (
+        `http://www.flipkart.com/search?q=${queryTitle}`
+      );
+  }
+}
+
+function getKey (obj) {
+  return Object.keys(obj)[0];
+}
 
 function handleCompare (req, res) {
   const url = req.query.url;
@@ -39,36 +59,34 @@ function handleCompare (req, res) {
         return reject(err);
       }
 
-      const siteData = response.body;
-      const title = siteData[site].title;
-      const queryTitle = encodeURIComponent(title).replace(/%20/g, '+');
-
-      const snapdealSearchURL = `http://www.snapdeal.com/search?keyword=${queryTitle}&santizedKeyword=&catId=&categoryId=&suggested=false&vertical=&noOfResults=5&clickSrc=go_header&lastKeyword=&prodCatId=&changeBackToAll=false&foundInAll=false&categoryIdSearched=&cityPageUrl=&url=&utmContent=&dealDetail=`;
-      resolve({snapdealSearchURL, siteData});
+      const requestURLData = response.body;
+      const title = requestURLData[site].title;
+      const searchURL = getSearchURL({site, title});
+      resolve({searchURL, requestURLData});
     });
   })
   .then(props => {
-    const searchURL = props.snapdealSearchURL;
-    const siteData = props.siteData;
+    const searchURL = props.searchURL;
+    const requestURLData = props.requestURLData;
 
     return new Promise((resolve, reject) => {
       request
       .get(searchURL)
       .set('User-Agent', userAgentString)
-      .end((err, response) => {
+      .end((err, searchURLResponse) => {
         if (err) {
           reject (err);
         }
 
-        resolve({response, siteData});
+        resolve({searchURLResponse, requestURLData});
       });
     })
   })
   .then(props => {
-    const response = props.response;
-    const siteData = props.siteData;
+    const searchURLResponse = props.searchURLResponse;
+    const requestURLData = props.requestURLData;
 
-    const body = response.text;
+    const body = searchURLResponse.text;
     const $ = cheerio.load(body);
     const potentialURLs = [];
 
@@ -77,11 +95,11 @@ function handleCompare (req, res) {
       potentialURLs.push($(item).attr('href'));
     });
 
-    return {potentialURLs, siteData};
+    return {potentialURLs, requestURLData};
   })
   .then(props => {
     const potentialURLs = props.potentialURLs;
-    const siteData = props.siteData;
+    const requestURLData = props.requestURLData;
 
     return Promise.all(potentialURLs.map(potentialURL => {
       return new Promise((resolve, reject) => {
@@ -89,28 +107,24 @@ function handleCompare (req, res) {
         const requestURL = `${baseURL}?url=${potentialURL}&site=${resultSite}`;
         request
         .get(requestURL)
-        .end((err, response) => {
+        .end((err, potentialURLResponse) => {
           if (err) {
             reject(err);
           }
 
-          resolve(response.body);
+          resolve(potentialURLResponse.body);
         });
       });
     }))
-    .then(responses => {
-      return {responses, siteData};
+    .then(potentialResults => {
+      return {potentialResults, requestURLData};
     })
   })
   .then(props => {
-    const siteData = props.siteData;
-    const responses = props.responses;
-    const relevantResult = relevance.findRelevant(siteData.flipkart, responses.map(response => {
-      return response['snapdeal'];
-    }));
-    res.json(merge(siteData, {
-      snapdeal: relevantResult
-    }));
+    const requestURLData = props.requestURLData;
+    const potentialResults = props.potentialResults;
+    const relevantResult = relevance.findRelevant(requestURLData, potentialResults);
+    res.json(merge(requestURLData, relevantResult));
   })
   .catch(error => {
     console.log(error);

@@ -2,6 +2,7 @@
 
 var lodash = require('lodash');
 var merge = lodash.merge;
+var values = lodash.values;
 
 const RELEVANCE = {
   WORD_COUNT_TITLE: .3,
@@ -33,13 +34,27 @@ function findDifferentWords (sentenceA, sentenceB) {
   return (differentWords.length > 10 ? 10 : differentWords.length);
 }
 
-function findRelevant (baseProduct, potentialMatches) {
+/**
+  baseProductScraped : {
+    <sellerKey> : {
+      title: ...,
+      price: ...,
+      image: ...
+    }
+  }
+*/
+function findRelevant (baseProductScraped, potentialMatchesScraped) {
   // check for -
   // . word count in title
   // . similar words in title
   // . similarity in price
   // . ?
-  // score each potential match based on such factors and return a
+  // score each potential match based on such factors and return a score
+
+  const baseProduct = values(baseProductScraped)[0];
+  const potentialMatches = potentialMatchesScraped.map(potentialMatchScraped => {
+    return values(potentialMatchScraped)[0];
+  });
 
   const baseTitle = baseProduct.title;
   const basePrice = baseProduct.price;
@@ -68,7 +83,7 @@ function findRelevant (baseProduct, potentialMatches) {
   });
 
   if (sortedMatches.length && sortedMatches[0].score >= 0.85) {
-    return sortedMatches[0];
+    return {[sortedMatches[0].site]: sortedMatches[0]};
   }
 
   return;
