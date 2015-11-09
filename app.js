@@ -6,9 +6,9 @@ let express = require('express');
 let app = express();
 let cheerio = require('cheerio');
 let lodash = require('lodash');
-// let async = require('async');
-
 let merge = lodash.merge;
+
+var relevance = require('./src/relevance');
 
 const baseURL = 'http://localhost:6100/scrape';
 
@@ -41,9 +41,9 @@ function handleCompare (req, res) {
 
       const siteData = response.body;
       const title = siteData[site].title;
-      const queryTitle = title.replace(/\s/g, '+');
+      const queryTitle = encodeURIComponent(title).replace(/%20/g, '+');
 
-      const snapdealSearchURL = `http://www.snapdeal.com/search?keyword=${queryTitle}&noOfResults=5`;
+      const snapdealSearchURL = `http://www.snapdeal.com/search?keyword=${queryTitle}&santizedKeyword=&catId=&categoryId=&suggested=false&vertical=&noOfResults=5&clickSrc=go_header&lastKeyword=&prodCatId=&changeBackToAll=false&foundInAll=false&categoryIdSearched=&cityPageUrl=&url=&utmContent=&dealDetail=`;
       resolve({snapdealSearchURL, siteData});
     });
   })
@@ -70,22 +70,23 @@ function handleCompare (req, res) {
 
     const body = response.text;
     const $ = cheerio.load(body);
-    const searchResults = [];
+    const potentialURLs = [];
 
     // this is specific to Snapdeal Search Results
     $('.products_wrapper .product_grid_row .product-txtWrapper a.prodLink').each((index, item) => {
-      searchResults.push($(item).attr('href'));
+      potentialURLs.push($(item).attr('href'));
     });
 
-    return {searchResults, siteData};
+    return {potentialURLs, siteData};
   })
   .then(props => {
-    const searchResults = props.searchResults;
+    const potentialURLs = props.potentialURLs;
     const siteData = props.siteData;
 
-    return Promise.all(searchResults.map(searchURL => {
+    return Promise.all(potentialURLs.map(potentialURL => {
       return new Promise((resolve, reject) => {
-        const requestURL = `${baseURL}?url=${searchURL}&site=snapdeal`;
+        const resultSite = getSite(potentialURL);
+        const requestURL = `${baseURL}?url=${potentialURL}&site=${resultSite}`;
         request
         .get(requestURL)
         .end((err, response) => {
@@ -95,7 +96,7 @@ function handleCompare (req, res) {
 
           resolve(response.body);
         });
-      })
+      });
     }))
     .then(responses => {
       return {responses, siteData};
@@ -104,7 +105,12 @@ function handleCompare (req, res) {
   .then(props => {
     const siteData = props.siteData;
     const responses = props.responses;
-    res.json(merge(siteData, responses));
+    const relevantResult = relevance.findRelevant(siteData.flipkart, responses.map(response => {
+      return response['snapdeal'];
+    }));
+    res.json(merge(siteData, {
+      snapdeal: relevantResult
+    }));
   })
   .catch(error => {
     console.log(error);
