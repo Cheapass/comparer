@@ -82,7 +82,9 @@ function findRelevant (baseProductScraped, potentialMatchesScraped) {
     return a.score < b.score;
   });
 
-  if (sortedMatches.length && sortedMatches[0].score >= 0.85) {
+  // console.log(sortedMatches);
+
+  if (sortedMatches.length && sortedMatches[0].score >= 0.8) {
     return {[sortedMatches[0].site]: sortedMatches[0]};
   }
 

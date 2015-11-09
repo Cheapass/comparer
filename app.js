@@ -7,6 +7,7 @@ let app = express();
 let cheerio = require('cheerio');
 let lodash = require('lodash');
 let merge = lodash.merge;
+let values = lodash.values;
 
 var relevance = require('./src/relevance');
 
@@ -35,9 +36,29 @@ function getSearchURL (props) {
       );
     case 'snapdeal':
       return (
-        `http://www.flipkart.com/search?q=${queryTitle}`
+        `http://www.flipkart.com/search?q=${queryTitle}&count=5`
       );
   }
+}
+
+function getPotentialURLs ($, site) {
+  let potentialURLs = [];
+
+  switch (site) {
+    case 'snapdeal':
+      $('.products_wrapper .product_grid_row .product-txtWrapper a.prodLink').each((index, item) => {
+        potentialURLs.push($(item).attr('href'));
+      });
+      break;
+    case 'flipkart':
+      $('#products .old-grid .product-unit .pu-details .pu-title a').each((index, item) => {
+        const href = $(item).attr('href');
+        potentialURLs.push(`http://www.flipkart.com${href}`);
+      });
+      break;
+  }
+
+  return potentialURLs;
 }
 
 function getKey (obj) {
@@ -78,22 +99,18 @@ function handleCompare (req, res) {
           reject (err);
         }
 
-        resolve({searchURLResponse, requestURLData});
+        resolve({searchURL, searchURLResponse, requestURLData});
       });
     })
   })
   .then(props => {
+    const searchURL = props.searchURL;
     const searchURLResponse = props.searchURLResponse;
     const requestURLData = props.requestURLData;
 
     const body = searchURLResponse.text;
     const $ = cheerio.load(body);
-    const potentialURLs = [];
-
-    // this is specific to Snapdeal Search Results
-    $('.products_wrapper .product_grid_row .product-txtWrapper a.prodLink').each((index, item) => {
-      potentialURLs.push($(item).attr('href'));
-    });
+    const potentialURLs = getPotentialURLs($, getSite(searchURL));
 
     return {potentialURLs, requestURLData};
   })
