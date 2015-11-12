@@ -49,6 +49,11 @@ function getSearchURL (props) {
     return (
       `http://www.snapdeal.com/search?keyword=${queryTitle}&santizedKeyword=&catId=&categoryId=&suggested=false&vertical=&noOfResults=5&clickSrc=go_header&lastKeyword=&prodCatId=&changeBackToAll=false&foundInAll=false&categoryIdSearched=&cityPageUrl=&url=&utmContent=&dealDetail=`
     );
+
+    case SITES.AMAZON:
+    return (
+      `http://www.amazon.in/s?field-keywords=${queryTitle}`
+    )
   }
 }
 
@@ -67,9 +72,13 @@ function getPotentialURLs ($, site) {
         potentialURLs.push(`http://www.flipkart.com${href}`);
       });
       break;
+    case SITES.AMAZON:
+      $('.s-result-list .s-result-item .a-link-normal.s-access-detail-page').each((index, item) => {
+        potentialURLs.push($(item).attr('href'));
+      });
   }
 
-  return potentialURLs;
+  return potentialURLs.splice(0, 5);
 }
 
 function handleCompare (req, res) {
@@ -89,9 +98,10 @@ function handleCompare (req, res) {
 
       const requestURLData = response.body;
       const title = requestURLData[requestSite].title;
-      const searchURLs = getOtherSites(requestSite)
+      const searchURLs =
+        getOtherSites(requestSite)
         .map(otherSite => getSearchURL({site: otherSite, title}))
-        .filter(site => site);
+        .filter(searchURL => searchURL);
 
       resolve({searchURLs, requestURLData});
     });
