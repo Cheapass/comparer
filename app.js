@@ -35,9 +35,24 @@ function getOtherSites (site) {
 }
 
 function getSearchURL (props) {
+  const requestSite = props.requestSite;
   const site = props.site;
-  const title = props.title;
-  const queryTitle = encodeURIComponent(title).replace(/%20/g, '+');
+  const data = props.data;
+  const title = data.title;
+  const category = data.category;
+
+  let toEncode = title;
+  if (requestSite === SITES.FLIPKART && category === 'sunglass') {
+    toEncode = `${toEncode} ${data.styleCode}`;
+  }
+
+  // TODO comparer cannot compare using just title/frequency of words and price.
+  // TODO it needs a lot more info like [styleCode (BIG+),] for fashion products
+
+  console.log(toEncode);
+  const queryTitle = encodeURIComponent(toEncode).replace(/%20/g, '+');
+  console.log(queryTitle);
+
 
   switch (site) {
     case SITES.FLIPKART:
@@ -47,7 +62,7 @@ function getSearchURL (props) {
 
     case SITES.SNAPDEAL:
     return (
-      `http://www.snapdeal.com/search?keyword=${queryTitle}&santizedKeyword=&catId=&categoryId=&suggested=false&vertical=&noOfResults=5&clickSrc=go_header&lastKeyword=&prodCatId=&changeBackToAll=false&foundInAll=false&categoryIdSearched=&cityPageUrl=&url=&utmContent=&dealDetail=`
+      `http://www.snapdeal.com/search?keyword=${queryTitle}&santizedKeyword=&catId=&categoryId=&suggested=false&vertical=&noOfResults=15&clickSrc=go_header&lastKeyword=&prodCatId=&changeBackToAll=false&foundInAll=false&categoryIdSearched=&cityPageUrl=&url=&utmContent=&dealDetail=`
     );
 
     case SITES.AMAZON:
@@ -74,11 +89,13 @@ function getPotentialURLs ($, site) {
       break;
     case SITES.AMAZON:
       $('.s-result-list .s-result-item .a-link-normal.s-access-detail-page').each((index, item) => {
-        potentialURLs.push($(item).attr('href'));
+        if ($(item).attr('href').indexOf('http://www.amazon.in') >= 0) {
+          potentialURLs.push($(item).attr('href'));
+        }
       });
   }
 
-  return potentialURLs.splice(0, 5);
+  return potentialURLs;
 }
 
 function handleCompare (req, res) {
@@ -97,10 +114,9 @@ function handleCompare (req, res) {
       }
 
       const requestURLData = response.body;
-      const title = requestURLData[requestSite].title;
       const searchURLs =
         getOtherSites(requestSite)
-        .map(otherSite => getSearchURL({site: otherSite, title}))
+        .map(otherSite => getSearchURL({requestSite, site: otherSite, data: requestURLData[requestSite]}))
         .filter(searchURL => searchURL);
 
       resolve({searchURLs, requestURLData});
